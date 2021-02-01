@@ -41,5 +41,22 @@
 #define LUNA_METHOD_CHECKHTTP		"checkhttp"
 #define LUNA_METHOD_GETHOSTNAME		"gethostname"
 #define LUNA_METHOD_SETHOSTNAME		"sethostname"
+#define LUNA_METHOD_ADDVLAN             "createVlan"
+#define LUNA_METHOD_DELETEVLAN          "deleteVlan"
+
 
 #endif /* _NETTOOLS_SERVICE_H_ */
+
+
+/**
+ * IPv4 information structure for the service
+ *
+ * Includes method (auto/manual), ip address, prefix length and gateway address
+ */
+typedef struct ipv4info
+{
+	gchar *method;
+	gchar *address;
+	gchar *netmask;
+	gchar *gateway;
+} ipv4info_t;

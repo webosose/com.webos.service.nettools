@@ -41,6 +41,7 @@ extern void LSMessageReplyErrorUnknown(LSHandle *sh, LSMessage *message);
 extern void LSMessageReplyErrorInvalidParams(LSHandle *sh, LSMessage *message);
 extern void LSMessageReplyErrorBadJSON(LSHandle *sh, LSMessage *message);
 extern void LSMessageReplyCustomError(LSHandle *sh, LSMessage *message, const char *errormsg);
+extern void LSMessageReplyCustomErrorwithErrorcode(LSHandle *sh, LSMessage *message, const char *errormsg, unsigned int error_code);
 extern void LSMessageReplySuccess(LSHandle *sh, LSMessage *message);
 extern bool LSMessageValidateSchema(LSHandle *sh, LSMessage *message, raw_buffer schema, jvalue_ref *parsedObj);
 

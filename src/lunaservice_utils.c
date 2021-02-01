@@ -102,6 +102,27 @@ LSMessageReplyCustomError(LSHandle *sh, LSMessage *message, const char *errormsg
 }
 
 void
+LSMessageReplyCustomErrorwithErrorcode(LSHandle *sh, LSMessage *message,
+                          const char *errormsg, unsigned int error_code)
+{
+	LSError lserror;
+	LSErrorInit(&lserror);
+	char *errorString;
+
+	errorString = g_strdup_printf("{\"returnValue\":false,\"errorText\":\"%s\",\"errorCode\":%d}", errormsg, error_code);
+
+	bool retVal = LSMessageReply(sh, message, errorString, NULL);
+
+	if (!retVal)
+	{
+		LSErrorPrint(&lserror, stderr);
+		LSErrorFree(&lserror);
+	}
+
+	g_free(errorString);
+}
+
+void
 LSMessageReplySuccess(LSHandle *sh, LSMessage *message)
 {
 	LSError lserror;

@@ -8,6 +8,8 @@
         "com.webos.service.nettools/gethostname"
     ],
     "nettools.management": [
-        "com.webos.service.nettools/sethostname"
+        "com.webos.service.nettools/sethostname",
+        "com.webos.service.nettools/createVlan",
+        "com.webos.service.nettools/deleteVlan"
     ]
 }

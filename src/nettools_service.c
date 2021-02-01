@@ -62,10 +62,12 @@ errorText | Yes | String | Error description
 #include <glib-object.h>
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <ifaddrs.h>
 
 #include "nettools_service.h"
 #include "lunaservice_utils.h"
 #include "json_utils.h"
+#include "errors.h"
 
 static LSHandle *pLsHandle;
 
@@ -1193,18 +1195,350 @@ cleanup:
 }
 
 
+static bool isInterfacePresent(char* interfaceName)
+{
+	struct ifaddrs *ifaddr, *ifa;
+	int n;
+	if (getifaddrs(&ifaddr) == -1)
+		return false;
+
+	for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++)
+	{
+		if(!g_strcmp0(interfaceName, ifa->ifa_name))
+		{
+			freeifaddrs(ifaddr);
+			return true;
+		}
+	 }
+
+	freeifaddrs(ifaddr);
+	return false;
+}
+//->Start of API documentation comment block
+/**
+@page com_webos_nettools com.webos.nettools
+@{
+@section com_webos_nettools_addvlan addvlan
+
+Set a vlanid for provided interface
+
+@par Parameters
+Name | Required | Type | Description
+-----|--------|------|----------
+vlanid	| yes	| String	| Vlan Id, range 1 ~ 4094
+ifName	| yes	| String	| Interface on which to add the VLAN
+method	| no	| String	| "dhcp", "manual" or "off"
+address	| no	| String	| If specified, sets a new IP address (only when method is "manual")
+netmask	| no	| String	| If specified, sets a new netmask (only when method is "manual")
+gateway	| no	| String	| If specified, sets a new gateway IP address (only when method is "manual")
+
+
+@par Returns(Call)
+Name | Required | Type | Description
+-----|--------|------|----------
+returnValue | yes | Boolean | Indicates the status of operation. Possible values are:
+                              true - Indicates that the operation was successful.
+                              false - Indicates that the operation failed.
+
+@par Returns(Subscription)
+None
+
+@}
+*/
+//->End of API documentation comment block
+
+
+/**
+ *  @brief Handler for "addVlan" command.
+ *
+ *  JSON format:
+ *  luna://com.webos.service.nettools/addVlan {"vlanid":<VLAN ID>, "ifName" : <Interface Name> }
+ *
+ */
+
+static bool handleCreateVlan(LSHandle *sh, LSMessage *message, void* context)
+{
+	// Add any validation checks here
+
+	// To prevent memory leaks, schema should be checked before the variables will be initialized.
+
+	jvalue_ref parsedObj = {0};
+	if (!LSMessageValidateSchema(sh, message,
+		j_cstr_to_buffer(STRICT_SCHEMA(PROPS_6(PROP(vlanid, integer), OBJECT(interface, OBJSCHEMA_1(PROP(name, string))),
+                                 PROP(method, string), PROP(address, string), PROP(netmask, string), PROP(gateway, string))
+			REQUIRED_2(vlanid, interface))), &parsedObj))
+		return true;
+
+	jvalue_ref vlanIdObj = {0},  interfaceObj= {0}, interfaceNameObj= {0}, methodObj = {0}, addressObj = {0}, netmaskObj = {0},
+		   gatewayObj = {0};
+	guint32 vlanId = 0;
+	gchar *interfaceName = NULL;
+	ipv4info_t ipv4 = {0};
+	char addLink[80] = {0,};
+	char addIPv4[90] = {0,};
+	char vlan_interface[20] = {0,};
+	// Parse vlanid
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("vlanid"),&vlanIdObj))
+	{
+		int vlan_id_num = 0;
+		jnumber_get_i32(vlanIdObj, &vlan_id_num);
+		if (vlan_id_num < 0 || vlan_id_num > 4094)
+		{
+			LSMessageReplyCustomErrorwithErrorcode(sh, message, "Vlanid does not have a valid data", VLAN_ERR_INVALID_VLAN_INDEX);
+			goto exit;
+		}
+		else
+			jnumber_get_i32(vlanIdObj, &vlanId);
+	}
+
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("interface"), &interfaceObj))
+	{
+		if (jobject_get_exists(interfaceObj, J_CSTR_TO_BUF("name"), &interfaceNameObj))
+		{
+			raw_buffer interfaceName_buf = jstring_get(interfaceNameObj);
+			interfaceName = g_strdup(interfaceName_buf.m_str);
+			jstring_free_buffer(interfaceName_buf);
+		}
+		else
+		{
+			LSMessageReplyCustomError(sh, message, "Could not validate json message against schema");
+			goto exit;
+		}
+	}
+
+	sprintf(vlan_interface,"%s.%d",interfaceName, vlanId);
+	if(!isInterfacePresent(interfaceName))
+	{
+		LSMessageReplyCustomErrorwithErrorcode(sh, message, "Invalid Interface", VLAN_ERR_INVALID_INTERFACE);
+		goto exit;
+	}
+	else if(isInterfacePresent(vlan_interface))
+	{
+		LSMessageReplyCustomErrorwithErrorcode(sh, message, "VLAN Index already Exist", VLAN_ERR_VLANID_EXISTS);
+		goto exit;
+	}
+
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("method"), &methodObj))
+	{
+		raw_buffer method_buf = jstring_get(methodObj);
+		ipv4.method = g_strdup(method_buf.m_str);
+		jstring_free_buffer(method_buf);
+
+	}
+
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("address"), &addressObj))
+	{
+		raw_buffer address_buf = jstring_get(addressObj);
+		ipv4.address = g_strdup(address_buf.m_str);
+		jstring_free_buffer(address_buf);
+
+		if (!is_valid_ipaddress(ipv4.address))
+		{
+			LSMessageReplyCustomErrorwithErrorcode(sh, message, "passed ipv4 address parameters does not have a valid data", VLAN_ERR_INVALID_ADDRESS);
+			goto exit;
+		}
+	}
+
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("netmask"), &netmaskObj))
+	{
+		raw_buffer netmask_buf = jstring_get(netmaskObj);
+		ipv4.netmask = g_strdup(netmask_buf.m_str);
+		jstring_free_buffer(netmask_buf);
+
+		if (!is_valid_ipaddress(ipv4.netmask))
+		{
+			LSMessageReplyCustomErrorwithErrorcode(sh, message, "passed netmask parameters does not have a valid data", VLAN_ERR_INVALID_NETMASK);
+			goto exit;
+		}
+	}
+
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("gateway"), &gatewayObj))
+	{
+		raw_buffer gateway_buf = jstring_get(gatewayObj);
+		ipv4.gateway = g_strdup(gateway_buf.m_str);
+		jstring_free_buffer(gateway_buf);
+
+		if (!is_valid_ipaddress(ipv4.gateway))
+		{
+			LSMessageReplyCustomErrorwithErrorcode(sh, message, "passed gateway parameters does not have a valid data", VLAN_ERR_INVALID_NETMASK);
+			goto exit;
+		}
+	}
+
+	if (!g_strcmp0(ipv4.method, "manual"))
+	{
+
+		if (ipv4.address == NULL || ipv4.netmask == NULL || ipv4.gateway == NULL)
+				LSMessageReplyCustomErrorwithErrorcode(sh, message, "Address, netmask as well as gateway should be specified for out of range networks", VLAN_ERR_MSG_PARSE_FAIL);
+
+		else
+		{
+			sprintf(addLink,"ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
+			system(addLink);
+			system("ip link");
+			sprintf(addIPv4,"ifconfig %s.%d %s netmask %s broadcast %s",interfaceName, vlanId, ipv4.address, ipv4.netmask, ipv4.gateway);
+			system(addIPv4);
+			LSMessageReplySuccess(sh, message);
+		}
+	}
+	else if ((ipv4.method == NULL) || (!g_strcmp0(ipv4.method, "dhcp")))
+	{
+		sprintf(addLink,"ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
+		printf("Fun: %s Line: %d  addLink: %s ", __FUNCTION__, __LINE__, addLink);
+		system(addLink);
+		system("ip link");
+		LSMessageReplySuccess(sh, message);
+	}
+	else
+	{
+		LSMessageReplyCustomErrorwithErrorcode(sh, message, "passed method does not exist", VLAN_ERR_INVALID_METHOD);
+	}
+
+
+exit:
+	j_release(&parsedObj);
+	g_free(ipv4.method);
+	g_free(ipv4.address);
+	g_free(ipv4.netmask);
+	g_free(ipv4.gateway);
+	return true;
+}
+
+
+//->Start of API documentation comment block
+/**
+@page com_webos_nettools com.webos.nettools
+@{
+@section com_webos_nettools_deletevlan deletevlan
+
+Delete provided interface vlanid
+
+@par Parameters
+Name | Required | Type | Description
+-----|--------|------|----------
+vlanid	| yes	| String	| Vlan Id, range 1 ~ 4094
+ifName	| yes	| String	| Interface on which to add the VLAN
+
+@par Returns(Call)
+Name | Required | Type | Description
+-----|--------|------|----------
+returnValue | yes | Boolean | Indicates the status of operation. Possible values are:
+                              true - Indicates that the operation was successful.
+                              false - Indicates that the operation failed.
+
+@par Returns(Subscription)
+None
+
+@}
+*/
+//->End of API documentation comment block
+
+
+/**
+ *  @brief Handler for "deleteVlan" command.
+ *
+ *  JSON format:
+ *  luna://com.webos.service.nettools/deleteVlan {"vlanid":<VLAN ID>, "ifName" : <Interface Name> }
+ *
+ */
+
+static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
+{
+	// Add any validation checks here
+
+	// To prevent memory leaks, schema should be checked before the variables will be initialized.
+	jvalue_ref parsedObj = {0};
+	if (!LSMessageValidateSchema(sh, message,
+				j_cstr_to_buffer(STRICT_SCHEMA(PROPS_6(PROP(vlanid, integer), OBJECT(interface, OBJSCHEMA_1(PROP(name, string))),
+							PROP(method, string), PROP(address, string), PROP(netmask, string), PROP(gateway, string))
+						REQUIRED_2(vlanid, interface))), &parsedObj))
+		return true;
+
+	jvalue_ref vlanIdObj = {0},  interfaceObj= {0}, interfaceNameObj= {0};
+	guint32 vlanId = 0;
+	gchar *interfaceName = NULL;
+	char vlan_interface[20] = {0,};
+
+	// Parse vlanid
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("vlanid"),&vlanIdObj))
+	{
+		int vlan_id_num = 0;
+		jnumber_get_i32(vlanIdObj, &vlan_id_num);
+		if (vlan_id_num < 0 || vlan_id_num > 4094)
+		{
+			LSMessageReplyCustomErrorwithErrorcode(sh, message, "Vlanid does not have a valid data", VLAN_ERR_INVALID_VLAN_INDEX);
+			goto exit;
+		}
+		else
+			jnumber_get_i32(vlanIdObj, &vlanId);
+	}
+
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("interface"), &interfaceObj))
+	{
+		if (jobject_get_exists(interfaceObj, J_CSTR_TO_BUF("name"), &interfaceNameObj))
+		{
+			raw_buffer interfaceName_buf = jstring_get(interfaceNameObj);
+			interfaceName = g_strdup(interfaceName_buf.m_str);
+			jstring_free_buffer(interfaceName_buf);
+		}
+		else
+		{
+			LSMessageReplyCustomError(sh, message, "Could not validate json message against schema");
+			goto exit;
+		}
+	}
+
+	sprintf(vlan_interface,"%s.%d",interfaceName, vlanId);
+
+	if(!isInterfacePresent(interfaceName))
+	{
+		LSMessageReplyCustomErrorwithErrorcode(sh, message, "Invalid Interface", VLAN_ERR_INVALID_INTERFACE);
+		goto exit;
+	}
+	else if(!isInterfacePresent(vlan_interface))
+	{
+		LSMessageReplyCustomErrorwithErrorcode(sh, message, "VLAN Index does not Exist", VLAN_ERR_VLANID_DOESNOT_EXISTS);
+		goto exit;
+	}
+
+	char downLink[80] = {0,};
+	char delDev[80] = {0,};
+
+	sprintf(downLink,"ip link set dev %s.%d down", interfaceName, vlanId);
+	system(downLink);
+
+	sprintf(delDev,"ip link delete %s.%d", interfaceName, vlanId);
+	system(delDev);
+
+        LSMessageReplySuccess(sh, message);
+        goto exit;
+
+invalid_params:
+	LSMessageReplyErrorInvalidParams(sh, message);
+
+exit:
+
+	j_release(&parsedObj);
+
+	return true;
+}
+
+
+
 /**
  * com.webos.service.nettools service Luna Method Table
  */
 
 static LSMethod nettools_methods[] = {
     { LUNA_METHOD_PING,                 handlePingCommand },
-    { LUNA_METHOD_PINGV6,             handlePingV6Command },
+    { LUNA_METHOD_PINGV6,               handlePingV6Command },
     { LUNA_METHOD_ARPING,               handleArpingCommand },
     { LUNA_METHOD_RESOLVEHOSTNAME,      handleResolveHostnameCommand },
     { LUNA_METHOD_CHECKHTTP,            handleCheckHttpCommand },
     { LUNA_METHOD_GETHOSTNAME,          handleGetHostNameCommand },
     { LUNA_METHOD_SETHOSTNAME,          handleSetHostNameCommand },
+    { LUNA_METHOD_ADDVLAN,              handleCreateVlan },
+    { LUNA_METHOD_DELETEVLAN,           handleDeleteVlan },
     { NULL,  }
 };
 
