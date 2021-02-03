@@ -1,0 +1,5 @@
+{
+    "allowedNames": ["com.webos.service.nettools"],
+        "nettools.operation": ["dev"],
+        "nettools.management": ["oem"]
+}

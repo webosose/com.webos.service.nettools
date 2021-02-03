@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=com.webos.service.nettools
+Exec=@WEBOS_INSTALL_SBINDIR@/webos-nettools
+Type=dynamic

@@ -1,0 +1,13 @@
+{
+    "nettools.operation": [
+        "com.webos.service.nettools/arping",
+        "com.webos.service.nettools/ping",
+        "com.webos.service.nettools/ping6",
+        "com.webos.service.nettools/checkhttp",
+        "com.webos.service.nettools/resolvehostname",
+        "com.webos.service.nettools/gethostname"
+    ],
+    "nettools.management": [
+        "com.webos.service.nettools/sethostname"
+    ]
+}

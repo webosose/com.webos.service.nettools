@@ -1,0 +1,12 @@
+{
+    "exeName":"@WEBOS_INSTALL_SBINDIR@/webos-nettools",
+    "type": "regular",
+    "trustLevel" : "oem",
+    "allowedNames": ["com.webos.service.nettools"],
+    "permissions": [
+        {
+            "service":"com.webos.service.nettools",
+            "outbound":[]
+        }
+    ]
+}
