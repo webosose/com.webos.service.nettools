@@ -1264,9 +1264,9 @@ static bool handleCreateVlan(LSHandle *sh, LSMessage *message, void* context)
 
 	jvalue_ref parsedObj = {0};
 	if (!LSMessageValidateSchema(sh, message,
-		j_cstr_to_buffer(STRICT_SCHEMA(PROPS_6(PROP(vlanid, integer), OBJECT(interface, OBJSCHEMA_1(PROP(name, string))),
+		j_cstr_to_buffer(STRICT_SCHEMA(PROPS_6(PROP(index, integer), OBJECT(interface, OBJSCHEMA_1(PROP(name, string))),
                                  PROP(method, string), PROP(address, string), PROP(netmask, string), PROP(gateway, string))
-			REQUIRED_2(vlanid, interface))), &parsedObj))
+			REQUIRED_2(index, interface))), &parsedObj))
 		return true;
 
 	jvalue_ref vlanIdObj = {0},  interfaceObj= {0}, interfaceNameObj= {0}, methodObj = {0}, addressObj = {0}, netmaskObj = {0},
@@ -1278,7 +1278,7 @@ static bool handleCreateVlan(LSHandle *sh, LSMessage *message, void* context)
 	char addIPv4[90] = {0,};
 	char vlan_interface[20] = {0,};
 	// Parse vlanid
-	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("vlanid"),&vlanIdObj))
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("index"),&vlanIdObj))
 	{
 		int vlan_id_num = 0;
 		jnumber_get_i32(vlanIdObj, &vlan_id_num);
@@ -1449,9 +1449,8 @@ static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
 	// To prevent memory leaks, schema should be checked before the variables will be initialized.
 	jvalue_ref parsedObj = {0};
 	if (!LSMessageValidateSchema(sh, message,
-				j_cstr_to_buffer(STRICT_SCHEMA(PROPS_6(PROP(vlanid, integer), OBJECT(interface, OBJSCHEMA_1(PROP(name, string))),
-							PROP(method, string), PROP(address, string), PROP(netmask, string), PROP(gateway, string))
-						REQUIRED_2(vlanid, interface))), &parsedObj))
+				j_cstr_to_buffer(STRICT_SCHEMA(PROPS_2(PROP(index, integer), OBJECT(interface, OBJSCHEMA_1(PROP(name, string))))
+						REQUIRED_2(index, interface))), &parsedObj))
 		return true;
 
 	jvalue_ref vlanIdObj = {0},  interfaceObj= {0}, interfaceNameObj= {0};
@@ -1460,7 +1459,7 @@ static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
 	char vlan_interface[20] = {0,};
 
 	// Parse vlanid
-	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("vlanid"),&vlanIdObj))
+	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("index"),&vlanIdObj))
 	{
 		int vlan_id_num = 0;
 		jnumber_get_i32(vlanIdObj, &vlan_id_num);
