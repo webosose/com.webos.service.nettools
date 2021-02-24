@@ -1306,7 +1306,7 @@ static bool handleCreateVlan(LSHandle *sh, LSMessage *message, void* context)
 		}
 	}
 
-	sprintf(vlan_interface,"%s.%d",interfaceName, vlanId);
+	snprintf(vlan_interface, sizeof(vlan_interface), "%s.%d",interfaceName, vlanId);
 	if(!isInterfacePresent(interfaceName))
 	{
 		LSMessageReplyCustomErrorwithErrorcode(sh, message, "Invalid Interface", VLAN_ERR_INVALID_INTERFACE);
@@ -1373,17 +1373,17 @@ static bool handleCreateVlan(LSHandle *sh, LSMessage *message, void* context)
 
 		else
 		{
-			sprintf(addLink,"ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
+			snprintf(addLink, sizeof(addLink), "ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
 			system(addLink);
 			system("ip link");
-			sprintf(addIPv4,"ifconfig %s.%d %s netmask %s broadcast %s",interfaceName, vlanId, ipv4.address, ipv4.netmask, ipv4.gateway);
+			snprintf(addIPv4, sizeof(addIPv4), "ifconfig %s.%d %s netmask %s broadcast %s",interfaceName, vlanId, ipv4.address, ipv4.netmask, ipv4.gateway);
 			system(addIPv4);
 			LSMessageReplySuccess(sh, message);
 		}
 	}
 	else if ((ipv4.method == NULL) || (!g_strcmp0(ipv4.method, "dhcp")))
 	{
-		sprintf(addLink,"ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
+		snprintf(addLink, sizeof(addLink), "ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
 		printf("Fun: %s Line: %d  addLink: %s ", __FUNCTION__, __LINE__, addLink);
 		system(addLink);
 		system("ip link");
@@ -1457,6 +1457,8 @@ static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
 	guint32 vlanId = 0;
 	gchar *interfaceName = NULL;
 	char vlan_interface[20] = {0,};
+	char downLink[80] = {0,};
+	char delDev[80] = {0,};
 
 	// Parse vlanid
 	if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("index"),&vlanIdObj))
@@ -1487,7 +1489,7 @@ static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
 		}
 	}
 
-	sprintf(vlan_interface,"%s.%d",interfaceName, vlanId);
+	snprintf(vlan_interface, sizeof(vlan_interface), "%s.%d",interfaceName, vlanId);
 
 	if(!isInterfacePresent(interfaceName))
 	{
@@ -1500,20 +1502,14 @@ static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
 		goto exit;
 	}
 
-	char downLink[80] = {0,};
-	char delDev[80] = {0,};
-
-	sprintf(downLink,"ip link set dev %s.%d down", interfaceName, vlanId);
+	snprintf(downLink, sizeof(downLink), "ip link set dev %s.%d down", interfaceName, vlanId);
 	system(downLink);
 
-	sprintf(delDev,"ip link delete %s.%d", interfaceName, vlanId);
+	snprintf(delDev, sizeof(delDev), "ip link delete %s.%d", interfaceName, vlanId);
 	system(delDev);
 
         LSMessageReplySuccess(sh, message);
         goto exit;
-
-invalid_params:
-	LSMessageReplyErrorInvalidParams(sh, message);
 
 exit:
 
