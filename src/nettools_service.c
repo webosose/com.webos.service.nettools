@@ -850,7 +850,18 @@ static gboolean testHttpSocket(const char *hostUrl)
 		}
 
 		flags = fcntl(httpSocket, F_GETFL, 0);
-		fcntl(httpSocket, F_SETFL, flags | O_NONBLOCK);
+		if (flags == -1)
+		{
+			close(httpSocket);
+			continue;
+		}
+
+		int result = fcntl(httpSocket, F_SETFL, flags | O_NONBLOCK);
+		if (result == -1)
+		{
+			close(httpSocket);
+			continue;
+		}
 
 		do
 		{
@@ -893,7 +904,11 @@ static gboolean testHttpSocket(const char *hostUrl)
 		{
 			if(flags)
 			{
-				fcntl(httpSocket, F_SETFL, flags);
+				int fcntl_res = fcntl(httpSocket, F_SETFL, flags);
+				if (fcntl_res == -1)
+				{
+					g_error("fcntl F_SETFL on httpSocket failed");
+				}
 			}
 			close(httpSocket);
 		}
