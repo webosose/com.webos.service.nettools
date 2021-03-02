@@ -1181,7 +1181,8 @@ static bool handleSetHostNameCommand(LSHandle *sh, LSMessage *message, void* con
 		g_critical("Out of Memory!!!");
 		abort();
 	}
-	g_strlcpy(hostnameTmp, hostname, strlen(hostname)+1);
+
+	(void)g_strlcpy(hostnameTmp, hostname, strlen(hostname)+1);
 	hostnameTmp[strlen(hostname)]='\n';
 
 	gboolean ret = g_file_set_contents(HOSTNAME_FILE_DIR "/hostname", hostnameTmp, -1, NULL);
@@ -1524,7 +1525,6 @@ static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
 	system(delDev);
 
         LSMessageReplySuccess(sh, message);
-        goto exit;
 
 exit:
 
