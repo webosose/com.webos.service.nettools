@@ -1,6 +1,6 @@
 /* @@@LICENSE
 *
-*      Copyright (c) 2021 LG Electronics, Inc.
+*      Copyright (c) 2024 LG Electronics, Inc.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -1389,20 +1389,49 @@ static bool handleCreateVlan(LSHandle *sh, LSMessage *message, void* context)
 
 		else
 		{
-			snprintf(addLink, sizeof(addLink), "ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
-			system(addLink);
-			system("ip link");
-			snprintf(addIPv4, sizeof(addIPv4), "ifconfig %s.%d %s netmask %s broadcast %s",interfaceName, vlanId, ipv4.address, ipv4.netmask, ipv4.gateway);
-			system(addIPv4);
+                        GError *error = NULL;
+                        gint exit_status;
+                        snprintf(addLink, sizeof(addLink), "ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
+                        gchar *cmd1[] = {"sh", "-c",addLink, NULL};
+                        if(!g_spawn_sync(NULL, cmd1, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,NULL, NULL,&exit_status,&error))
+                        {
+                                g_printerr("Error executing command: %s\n", error->message);
+                                g_error_free(error);
+                        }
+                        gchar *cmd2[] = {"sh", "-c","ip link", NULL};
+                        if(!g_spawn_sync(NULL, cmd2, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,NULL, NULL,&exit_status,&error))
+                        {
+                                g_printerr("Error executing command: %s\n", error->message);
+                                g_error_free(error);
+                        }
+                        snprintf(addIPv4, sizeof(addIPv4), "ifconfig %s.%d %s netmask %s broadcast %s",interfaceName, vlanId, ipv4.address, ipv4.netmask, ipv4.gateway);
+                        gchar *cmd3[] = {"sh", "-c",addIPv4, NULL};
+                        if(!g_spawn_sync(NULL, cmd3, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,NULL, NULL,&exit_status,&error))
+                        {
+                                g_printerr("Error executing command: %s\n", error->message);
+                                g_error_free(error);
+                        }
 			LSMessageReplySuccess(sh, message);
 		}
 	}
 	else if ((ipv4.method == NULL) || (!g_strcmp0(ipv4.method, "dhcp")))
 	{
-		snprintf(addLink, sizeof(addLink), "ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
-		printf("Fun: %s Line: %d  addLink: %s ", __FUNCTION__, __LINE__, addLink);
-		system(addLink);
-		system("ip link");
+                GError *error = NULL;
+                gint exit_status;
+                snprintf(addLink, sizeof(addLink), "ip link add link %s name %s.%d type vlan id %d",interfaceName, interfaceName, vlanId, vlanId);
+                printf("Fun: %s Line: %d  addLink: %s ", __FUNCTION__, __LINE__, addLink);
+                gchar *cmd1[] = {"sh", "-c",addLink, NULL};
+                if(!g_spawn_sync(NULL, cmd1, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,NULL, NULL,&exit_status,&error))
+                {
+                        g_printerr("Error executing command: %s\n", error->message);
+                        g_error_free(error);
+                }
+                gchar *cmd2[] = {"sh", "-c","ip link", NULL};
+                if(!g_spawn_sync(NULL, cmd2, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,NULL, NULL,&exit_status,&error))
+                {
+                        g_printerr("Error executing command: %s\n", error->message);
+                        g_error_free(error);
+                }
 		LSMessageReplySuccess(sh, message);
 	}
 	else
@@ -1506,7 +1535,6 @@ static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
 	}
 
 	snprintf(vlan_interface, sizeof(vlan_interface), "%s.%d",interfaceName, vlanId);
-
 	if(!isInterfacePresent(interfaceName))
 	{
 		LSMessageReplyCustomErrorwithErrorcode(sh, message, "Invalid Interface", VLAN_ERR_INVALID_INTERFACE);
@@ -1519,10 +1547,22 @@ static bool handleDeleteVlan(LSHandle *sh, LSMessage *message, void* context)
 	}
 
 	snprintf(downLink, sizeof(downLink), "ip link set dev %s.%d down", interfaceName, vlanId);
-	system(downLink);
+        GError *error = NULL;
+        gint exit_status;
+        gchar *cmd1[] = {"sh", "-c",downLink, NULL};
+        if(!g_spawn_sync(NULL, cmd1, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,NULL, NULL,&exit_status,&error))
+        {
+                g_printerr("Error executing command: %s\n", error->message);
+                g_error_free(error);
+        }
 
-	snprintf(delDev, sizeof(delDev), "ip link delete %s.%d", interfaceName, vlanId);
-	system(delDev);
+        snprintf(delDev, sizeof(delDev), "ip link delete %s.%d", interfaceName, vlanId);
+        gchar *cmd2[] = {"sh", "-c",delDev, NULL};
+        if(!g_spawn_sync(NULL, cmd2, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,NULL, NULL,&exit_status,&error))
+        {
+                g_printerr("Error executing command: %s\n", error->message);
+                g_error_free(error);
+        }
 
         LSMessageReplySuccess(sh, message);
 
