@@ -43,7 +43,6 @@ errorText | Yes | String | Error description
 */
 //->End of API documentation comment block
 
-
 #include <glib.h>
 #include <stdbool.h>
 #include <time.h>
@@ -68,6 +67,8 @@ errorText | Yes | String | Error description
 #include "lunaservice_utils.h"
 #include "json_utils.h"
 #include "errors.h"
+
+#define CONFIG_FILE "/etc/nettools_access_control.conf"
 
 static LSHandle *pLsHandle;
 
@@ -1111,7 +1112,78 @@ static void send_hostname_to_subscribers(const gchar *hostname)
 	}
 	j_release(&reply);
 }
+// Function to read the entire file into a string
+char* read_file(const char *filename) {
+        GError *error = NULL;
+        gchar *content;
+        gsize length;
 
+        if (!g_file_get_contents(filename, &content, &length, &error)) {
+                g_printerr("Could not open config file: %s\n", error->message);
+                g_error_free(error);
+                return NULL;
+        }
+        return content;
+}
+
+// Function to check if an app is authorized
+int is_app_authorized(const char *app_name) {
+        char *config_data = read_file(CONFIG_FILE);
+        if (config_data == NULL) {
+            return 0;
+        }
+
+        jvalue_ref parsedObj = {0};
+        JSchemaInfo schemaInfo;
+        jschema_info_init(&schemaInfo, jschema_all(), NULL, NULL);
+
+        parsedObj = jdom_parse(j_cstr_to_buffer(config_data), DOMOPT_NOOPT, &schemaInfo);
+
+        if (jis_null(parsedObj)) {
+                g_printerr("Unable to parse JSON\n");
+                j_release(&parsedObj);
+                g_free(config_data);
+                return 0;
+        }
+
+        jvalue_ref whitelistObj, blacklistObj;
+        int authorized = 0;
+
+        if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("blacklist"), &blacklistObj) && jis_array(blacklistObj)) {
+                for (ssize_t i = 0; i < jarray_size(blacklistObj); i++) {
+                        jvalue_ref entry = jarray_get(blacklistObj, i);
+                        if (jis_string(entry)) {
+                                raw_buffer entry_buf = jstring_get(entry);
+                                if (g_strcmp0(entry_buf.m_str, app_name) == 0) {
+                                        authorized = 0;
+                                        jstring_free_buffer(entry_buf);
+                                        goto end;
+                                }
+                                jstring_free_buffer(entry_buf);
+                        }
+                }
+        }
+
+        if (jobject_get_exists(parsedObj, J_CSTR_TO_BUF("whitelist"), &whitelistObj) && jis_array(whitelistObj)) {
+                for (ssize_t i = 0; i < jarray_size(whitelistObj); i++) {
+                        jvalue_ref entry = jarray_get(whitelistObj, i);
+                        if (jis_string(entry)) {
+                                raw_buffer entry_buf = jstring_get(entry);
+                                if (g_strcmp0(entry_buf.m_str, app_name) == 0) {
+                                        authorized = 1;
+                                        jstring_free_buffer(entry_buf);
+                                        goto end;
+                                }
+                                jstring_free_buffer(entry_buf);
+                         }
+                }
+        }
+
+end:
+        j_release(&parsedObj);
+        g_free(config_data);
+        return authorized;
+}
 
 //->Start of API documentation comment block
 /**
@@ -1149,6 +1221,12 @@ None
 
 static bool handleSetHostNameCommand(LSHandle *sh, LSMessage *message, void* context)
 {
+        char *appName = LSMessageGetSenderServiceName(message);
+
+        if (!is_app_authorized(appName)) {
+                LSMessageReplyCustomError(sh, message, "Unauthorized service access");
+                return true;
+        }
 	// Add any validation checks here
 
 	// To prevent memory leaks, schema should be checked before the variables will be initialized.
