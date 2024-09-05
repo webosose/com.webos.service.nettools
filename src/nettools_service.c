@@ -123,7 +123,8 @@ static void ping(const char *hostname, const char *ifname, int packetSize, LSHan
 {
 	gchar *pingcmd = NULL, *ifnameStr = NULL, *pktSizeStr = NULL;
 	gchar *pingStdout = NULL, *pingStderr = NULL, **lines = NULL;
-	int exitStatus = 0, i = 0, len = 0;
+	int exitStatus = 0;
+	unsigned int i = 0, len = 0;
 	unsigned char ipaddress[16] = {0,};
 	char domainName[256] = {0,};
 
@@ -327,7 +328,8 @@ static void pingV6(const char *hostname, const char *ifname, int packetSize, LSH
 {
 	gchar *pingcmd = NULL, *ifnameStr = NULL, *pktSizeStr = NULL;
 	gchar *pingStdout = NULL, *pingStderr = NULL, **lines = NULL;
-	int exitStatus = 0, i = 0, len = 0;
+	int exitStatus = 0;
+	unsigned int i = 0, len = 0;
 	unsigned char ipaddress[40] = {0,};
 	char domainName[256] = {0,};
 
@@ -540,7 +542,8 @@ static void arping(const char *ipaddress, const char *ifname, LSHandle *sh, LSMe
 {
 	gchar *arpingcmd = NULL, **lines = NULL;
 	gchar *arpingStdout = NULL, *arpingStderr = NULL;
-	int exitStatus = 0, i = 0, len = 0;
+	int exitStatus = 0;
+	unsigned int i = 0, len = 0;
 
 	if(NULL == ipaddress || NULL == ifname)
 	{
@@ -1221,7 +1224,7 @@ None
 
 static bool handleSetHostNameCommand(LSHandle *sh, LSMessage *message, void* context)
 {
-        char *appName = LSMessageGetSenderServiceName(message);
+        const char *appName = LSMessageGetSenderServiceName(message);
 
         if (!is_app_authorized(appName)) {
                 LSMessageReplyCustomError(sh, message, "Unauthorized service access");
@@ -1292,11 +1295,10 @@ cleanup:
 static bool isInterfacePresent(char* interfaceName)
 {
 	struct ifaddrs *ifaddr, *ifa;
-	int n;
 	if (getifaddrs(&ifaddr) == -1)
 		return false;
 
-	for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++)
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
 	{
 		if(!g_strcmp0(interfaceName, ifa->ifa_name))
 		{
